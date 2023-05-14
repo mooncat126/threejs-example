@@ -1,0 +1,272 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+  <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r79/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.1/dat.gui.min.js"></script>
+    <html>
+      <body>
+        <div class="aviator" id="world"></div>
+        <!-- <canvas id="world" class="stage"></canvas> -->
+        <script>
+          // Our Javascript will go here.
+          const Colors = {
+            red: 0xf25346,
+            white: 0xd8d0d1,
+            brown: 0x59332e,
+            pink: 0xf5986e,
+            brownDark: 0x23190f,
+            blue: 0x68c3c0
+          };
+
+          let scene,
+            camera,
+            fieldOfView,
+            aspectRatio,
+            nearPlane,
+            farPlane,
+            HEIGHT,
+            WIDTH,
+            renderer,
+            container;
+
+          function createScene() {
+            HEIGHT = window.innerHeight;
+            WIDTH = window.innerWidth;
+
+            // Create the scene
+            scene = new THREE.Scene();
+
+            scene.fog = new THREE.Fog(0xf7d9aa, 100, 950);
+
+            // Create the camera
+            aspectRatio = WIDTH / HEIGHT;
+            fieldOfView = 60;
+            nearPlane = 1;
+            farPlane = 10000;
+            camera = new THREE.PerspectiveCamera(
+              fieldOfView,
+              aspectRatio,
+              nearPlane,
+              farPlane
+            );
+
+            // Set the position of the camera
+            camera.position.x = 0;
+            camera.position.z = 200;
+            camera.position.y = 100;
+
+            // Create the renderer
+            renderer = new THREE.WebGLRenderer({
+              alpha: true
+            });
+
+            renderer.setSize(WIDTH, HEIGHT);
+
+            // Enable shadow rendering
+            renderer.shadowMap.enabled = true;
+
+            container = document.getElementById("world");
+            container.appendChild(renderer.domElement);
+          }
+
+          let hemisphereLight, shadowLight, ambientLight;
+
+          function createLights() {
+            ambientLight = new THREE.AmbientLight(0xdc8874, 0.5);
+
+            hemisphereLight = new THREE.HemisphereLight(
+              0xaaaaaa,
+              0x000000,
+              0.9
+            );
+
+            shadowLight = new THREE.DirectionalLight(0xffffff, 0.9);
+
+            // Set the direction of the light
+            shadowLight.position.set(150, 350, 350);
+
+            // Allow shadow casting
+            shadowLight.castShadow = true;
+
+            // define the visible area of the projected shadow
+            shadowLight.shadow.camera.left = -400;
+            shadowLight.shadow.camera.right = 400;
+            shadowLight.shadow.camera.top = 400;
+            shadowLight.shadow.camera.bottom = -400;
+            shadowLight.shadow.camera.near = 1;
+            shadowLight.shadow.camera.far = 1000;
+
+            shadowLight.shadow.mapSize.width = 2048;
+            shadowLight.shadow.mapSize.height = 2048;
+
+            // to activate the lights, just add them to the scene
+            scene.add(ambientLight);
+            scene.add(hemisphereLight);
+            scene.add(shadowLight);
+          }
+
+          // First let's define a Sea object :
+          const Sea = function() {
+            const geom = new THREE.SphereGeometry(800, 80, 80);
+            // create the material
+            let mat = new THREE.MeshStandardMaterial({
+              color: new THREE.Color("rgb(0, 159, 140)"),
+              wireframe: true
+            });
+            new THREE.MeshPhongMaterial({
+              transparent: true,
+              opacity: 1,
+              shading: THREE.FlatShading
+            });
+
+            this.mesh = new THREE.Mesh(geom, mat);
+
+            // Allow the sea to receive shadows
+            this.mesh.receiveShadow = true;
+            this.mesh.geometry.verticesNeedUpdate = true;
+          };
+
+          let sea;
+
+          function createSea() {
+            sea = new Sea();
+            sea.mesh.position.y = -750;
+            scene.add(sea.mesh);
+          }
+
+          const AirPlane = function() {
+            this.mesh = new THREE.Object3D();
+
+            // Create the cabin
+            const geomCockpit = new THREE.BoxGeometry(80, 50, 50, 1, 1, 1);
+
+            const matCockpit = new THREE.MeshPhongMaterial({
+              color: Colors.red,
+              shading: THREE.FlatShading
+            });
+
+            // we can access a specific vertex of a shape through
+            // the vertices array, and then move its x, y and z property:
+            geomCockpit.vertices[4].y -= 10;
+            geomCockpit.vertices[4].z += 20;
+            geomCockpit.vertices[5].y -= 10;
+            geomCockpit.vertices[5].z -= 20;
+            geomCockpit.vertices[6].y += 30;
+            geomCockpit.vertices[6].z += 20;
+            geomCockpit.vertices[7].y += 30;
+            geomCockpit.vertices[7].z -= 20;
+
+            const cockpit = new THREE.Mesh(geomCockpit, matCockpit);
+            cockpit.castShadow = true;
+            cockpit.receiveShadow = true;
+            this.mesh.add(cockpit);
+
+            // Create the engine
+            const geomEngine = new THREE.BoxGeometry(20, 50, 50, 1, 1, 1);
+            const matEngine = new THREE.MeshPhongMaterial({
+              color: Colors.white,
+              shading: THREE.FlatShading
+            });
+            const engine = new THREE.Mesh(geomEngine, matEngine);
+            engine.position.x = 40;
+            engine.castShadow = true;
+            engine.receiveShadow = true;
+            this.mesh.add(engine);
+
+            // Create the tail
+            const geomTailPlane = new THREE.BoxGeometry(15, 20, 5, 1, 1, 1);
+            const matTailPlane = new THREE.MeshPhongMaterial({
+              color: Colors.red,
+              shading: THREE.FlatShading
+            });
+            const tailPlane = new THREE.Mesh(geomTailPlane, matTailPlane);
+            tailPlane.position.set(-35, 25, 0);
+            tailPlane.castShadow = true;
+            tailPlane.receiveShadow = true;
+            this.mesh.add(tailPlane);
+
+            // Create the wing
+            const geomSideWing = new THREE.BoxGeometry(40, 8, 150, 1, 1, 1);
+            const matSideWing = new THREE.MeshPhongMaterial({
+              color: Colors.red,
+              shading: THREE.FlatShading
+            });
+            const sideWing = new THREE.Mesh(geomSideWing, matSideWing);
+            sideWing.castShadow = true;
+            sideWing.receiveShadow = true;
+            this.mesh.add(sideWing);
+
+            // propeller
+            const geomPropeller = new THREE.BoxGeometry(20, 10, 10, 1, 1, 1);
+            const matPropeller = new THREE.MeshPhongMaterial({
+              color: Colors.brown,
+              shading: THREE.FlatShading
+            });
+            this.propeller = new THREE.Mesh(geomPropeller, matPropeller);
+            this.propeller.castShadow = true;
+            this.propeller.receiveShadow = true;
+
+            // blades
+            const geomBlade = new THREE.BoxGeometry(1, 100, 20, 1, 1, 1);
+            const matBlade = new THREE.MeshPhongMaterial({
+              color: Colors.brownDark,
+              shading: THREE.FlatShading
+            });
+
+            const blade = new THREE.Mesh(geomBlade, matBlade);
+            blade.position.set(8, 0, 0);
+            blade.castShadow = true;
+            blade.receiveShadow = true;
+            this.propeller.add(blade);
+            this.propeller.position.set(50, 0, 0);
+            this.mesh.add(this.propeller);
+          };
+
+          let airplane;
+
+          function createPlane() {
+            airplane = new AirPlane();
+            airplane.mesh.scale.set(0.65, 0.65, 0.65);
+            airplane.mesh.position.y = 100;
+            scene.add(airplane.mesh);
+          }
+
+          function loop() {
+            airplane.propeller.rotation.x += 0.2;
+            sea.mesh.rotation.x += 0.001;
+            sea.mesh.rotation.y += 0.006;
+
+            renderer.render(scene, camera);
+
+            requestAnimationFrame(loop);
+          }
+
+          function init() {
+            // set up the scene, the camera and the renderer
+            createScene();
+
+            // add the lights
+            createLights();
+
+            // add the objects
+            createPlane();
+            createSea();
+
+            loop();
+          }
+          window.addEventListener("load", init, false);
+        </script>
+      </body>
+    </html>
+  </head>
+
+  <style>
+    .aviator {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(#e4e0ba, #f7d9aa);
+    }
+  </style>
+</html>
